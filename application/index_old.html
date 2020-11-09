@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Vizualisation of frontiers</title>
+    <script src="https://d3js.org/d3.v4.js"></script>    <!-- This downloads d3 library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.15/lodash.min.js"> </script> <!-- This downloads lodash library -->
+
+    <!-- This downloads bootstrap library -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+
+    <!-- This downloads bootstrap library -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+
+    <script>
+        _ = _.noConflict();
+    </script>
+
+</head>
+
+<body class="container-fluid">
+<svg id="vizualisation">
+</svg>
+<div id="place_of_individual_component">
+    <div class="modal-body">
+        <p>Modal body text goes here.</p>
+    </div>
+</div>
+</body>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    // Vizualisation
+
+    var nb_per_line = 7,
+        margin = { top: 40, right: 8, bottom: 20, left: 8 },
+        w = window.innerWidth-(margin.top+margin.right),
+        h = window.innerHeight,
+        radius = 6;
+
+    const svg = d3.select("#vizualisation");
+    const grpWidth = Math.floor((w-(margin.right+margin.left))/7);
+    const grpHeight = Math.floor(grpWidth);
+    const grpMarginLeft = 20;
+    const grpMarginRight = 20;
+    const grpMarginTop = 20;
+    const grpMarginBottom = 20;
+    const scale = 1.5;
+    let compos_data = {}
+    svg.attr('width', w);   // Setting the width of the SVG.
+    svg.attr('height', h);
+
+    // IO Script
+    var socket = io();
+
+    // On demande le pseudo au visiteur...
+    // var pseudo = prompt('Quel est votre pseudo ?');
+    // Et on l'envoie avec le signal "petit_nouveau" (pour le différencier de "message")
+    // socket.emit('petit_nouveau', pseudo);
+
+    // On affiche une boîte de dialogue quand le serveur nous envoie un "message"
+    socket.on('message', function(message) {
+        alert('Le serveur a un message pour vous : ' + message);
+    })
+
+    // Demande les données pour commencer
+    socket.emit('ask_abstracted_data', null);
+
+    function ask_compo_data(id){
+        socket.emit('ask_compo_data', id);
+        alert('Les données de la compo ' + id +'ont étaients demandés.');
+        var newDiv = document.createElement("div");
+        var body = document.body
+        body.appendChild(newDiv);
+        newDiv.id = "compo"+id
+        create_modal(newDiv, id)
+
+    }
+
+    socket.on('reply_compo_data', function(compo_data) {
+        alert('Les données de la compo : ' + compo_data);
+        compo_data = JSON.parse(compo_data)
+        compos_data[compo_data.name] = compo_data
+        console.log(compos_data)
+        // document.getElementById('#compo'+compo_data.name).modal('show')
+        $('#compo'+compo_data.name).modal('show')
+    })
+
+
+    // Réception des données abstraites pour commencer
+    socket.on('reply_abstracted_data', function(message) {
+        var data = JSON.parse(message);
+        console.log(data)
+        nb_compo = 0;
+        _.forEach(data.components, function(values_compo, id_compo) {
+            svg.append("g")
+                .attr("id", 'grp' + id_compo)
+                .attr("transform", "translate(" + ((nb_compo % nb_per_line) * grpWidth + grpMarginLeft) + "," + (Math.floor(nb_compo / nb_per_line) * grpHeight + grpMarginTop) +")")
+                // .attr("cx", ((nb_compo % nb_per_line) * grpWidth))
+                // .attr("cy", Math.floor(nb_compo / nb_per_line) * h);
+            create_histograme(values_compo, id_compo)
+            nb_compo++;
+        });
+    })
+
+    // Lorsqu'on clique sur le bouton, on envoie un "message" au serveur
+    $('#poke').click(function () {
+        socket.emit('message', 'Salut serveur, ça va ?');
+    })
+</script>
+<script>
+    // Vizu Script
+
+
+
+    //This code will visualize a data set as a simple scatter chart using d3. I omit axes for simplicity.
+    //var data = ;
+
+    // console.log(data);
+    var group = []
+
+    const circleAttrs = {
+        cx: function(d) { return d.distance*scale; },
+        cy: function(d) { return d.pos_y*scale; },
+        r: function(d) {
+            if(d.classe=='frontier'){
+                return 1;
+            }
+            else {
+                return 2;
+            }
+        },
+        fill: function(d) {
+            if(d.classe=='frontier'){
+                return "black";
+            }
+            else if(d.classe=="0"){
+                return "blue";
+            }
+            else {
+                return "red";
+            }
+        }
+    };
+    // nb_compo = 0;
+    // _.forEach(data.components, function(values_compo, id_compo) {
+    //
+    //     showNodes(values_compo,id_compo)
+    //     nb_compo++;
+    // });
+
+    function create_histograme(values_compo, id_compo){
+
+        var margin = {top: 10, right: 20, bottom: 20, left: 40},
+            width = 200 - margin.left - margin.right,
+            height = 150 - margin.top - margin.bottom;
+
+        group = d3.select("#grp"+id_compo);
+        var elemm = document.getElementById("grp"+id_compo);
+        // elemm.setAttribute("onclick","alert('#grp"+id_compo+"');");
+        elemm.setAttribute("onclick","ask_compo_data('"+id_compo+"');");
+        // console.log(elemm)
+        values_compo.slices.columns = Object.keys(values_compo.slices[0])
+
+        // console.log(values_compo.slices)
+
+        // List of groups = header of the csv files
+        var keys = values_compo.slices.columns.slice(3)
+
+        // console.log(keys)
+
+        // Add X axis
+        // console.log(d3.extent(values_compo.slices, function(d) { return d.mean; }))
+        var x = d3.scaleLinear()
+            .domain(d3.extent(values_compo.slices, function(d) { return d.mean; }))
+            .range([ 0, width ]);
+        group.append("g")
+            .attr("class", "axis_x")
+            .attr("transform", "translate("+grpMarginLeft+"," + height + ")")
+            .call(d3.axisBottom(x).ticks(5));
+
+        // Add Y axis
+        var y = d3.scaleLinear()
+            .domain(defineYDomain(values_compo.slices))
+            .range([ height, 0 ]);
+        group.append("g")
+            .attr("class", "axis_y")
+            .call(d3.axisLeft(y).ticks(3))
+            .attr("transform", "translate("+grpMarginLeft+", 0)");
+
+
+        // color palette
+        var color = d3.scaleOrdinal()
+            .domain(keys)
+            .range(['red','blue'])
+
+        // console.log(keys)
+        // console.log(values_compo.slices)
+
+        //stack the data?
+        var stackedData = d3.stack()
+            .offset(d3.stackOffsetSilhouette)
+            .keys(keys)
+            (values_compo.slices)
+
+        // Show the areas
+        group
+            .selectAll("mylayers")
+            .data(stackedData)
+            .enter()
+            .append("path")
+            .style("fill", function(d) { return color(d.key); })
+            .attr("d", d3.area()
+                .x(function(d, i) { return x(d.data.mean); })
+                .y0(function(d) { return y(d[0]); })
+                .y1(function(d) { return y(d[1]); })
+            )
+            .attr("transform", "translate("+grpMarginLeft+", 0)");
+
+
+        // var element = document;
+        // console.log(group)
+        // console.log(group.querySelector(".axis_y"))
+        var element = document.getElementById("grp"+id_compo)
+        // console.log(element.querySelector(".axis_y"))
+        _.forEach(element.querySelector(".axis_y").children, function(child){
+            // console.log(child)
+            if(child.className.baseVal=="tick" && child.children[1].innerHTML < 0){
+                child.children[1].innerHTML = ""
+            }
+            else if(child.className.baseVal=="tick"){
+                // console.log(child)
+                child.children[1].innerHTML = child.children[1].innerHTML*2
+            }
+        })
+    }
+
+    function defineYDomain(slices) {
+        domain = 0
+        _.forEach(slices, function (slice) {
+            if((slice.classe0+slice.classe1) > domain){
+                domain = slice.classe0+slice.classe1
+            }
+        })
+        return [-(domain/2), (domain/2)]
+    }
+
+    function showNodes(values_compo, id_compo){
+
+        // svg.selectAll("circle")
+        //     .data(dataset)
+        //     .enter()
+        //     .append("circle")
+        //     .attr(circleAttrs)  // Get attributes from circleAttrs var
+        // .on("mouseover", handleMouseOver)
+        // .on("mouseout", handleMouseOut);
+
+        min_x = 0
+        max_y = 0
+        console.log(data.components[id_compo].nodes);
+        dataset = data.components[id_compo].nodes;
+        group[id_compo].selectAll("circle")
+            .data(dataset)
+            .enter()
+            .append("circle")
+            .attr("cx", function (d) {
+                return d.distance * scale;
+            })
+            .attr("cy", function (d) {
+                return d.pos_y * scale;
+            })
+            .attr("compo", id_compo)
+            .attr("r", function (d) {
+                if (d.classe == 'frontier') {
+                    return 1;
+                } else {
+                    return 2;
+                }
+            })
+            .attr("fill", function (d) {
+                if (d.classe == 'frontier') {
+                    return "black";
+                } else if (d.classe == "0") {
+                    return "blue";
+                } else {
+                    return "red";
+                }
+            })
+            .attr("transform", "translate(" + (-min_x + 100) + "," + 150 + ")")
+            .on("mouseover", showLinks)
+            .on("mouseout", hideLinks);
+        // group[id_compo].attr("transform", "translate("+(-min_x+100)+"," + 150 + ")")
+
+        // console.log(id);
+        // console.log(value);
+
+    }
+
+    function showLinks(d, i){
+        // console.log(d3.select(this).attr('compo'))
+        compo = d3.select(this).attr('compo')
+        d3.select(this).attr({
+            "r": 40
+        });
+        group[compo] = d3.select("#grp"+compo);
+        // console.log(data)
+        _.forEach(data.components[compo].edges, function(link){
+            // console.log(d.name.toString())
+            // console.log(link)
+            if(link.includes(d.name.toString())){
+                // console.log('ajout')
+                var target = link.filter(function(e) { return e != d.name.toString()})[0]
+                // console.log(target)
+                // console.log(data.components[compo].nodes)
+                target = data.components[compo].nodes.find(element => element.name == target)
+                var origin = data.components[compo].nodes.find(element => element.name == d.name.toString())
+                // console.log('or/tr')
+                // console.log(origin)
+                // console.log(target)
+                group[compo].append("line")
+                    .attr("id", "comp"+compo+"id"+origin.name+"id"+target.name)
+                    .attr("x1", target.distance*scale)
+                    .attr("y1", target.pos_y*scale)
+                    .attr("x2", origin.distance*scale)
+                    .attr("y2", origin.pos_y*scale)
+                    .attr("stroke-width", 1)
+                    .attr("stroke", "grey");
+                // console.log(d3.select("#comp"+compo+"id"+origin.name+"id"+target.name))
+            }
+        })
+
+    }
+
+    function hideLinks(d, i){
+        console.log('hide')
+        compo = d3.select(this).attr('compo')
+        console.log(d3.select(this).attr('compo'))
+        _.forEach(data.components[compo].edges, function(link){
+            d3.select("#comp"+compo+"id"+link[0]+"id"+link[1]).remove()
+            d3.select("#comp"+compo+"id"+link[1]+"id"+link[0]).remove()
+        })
+    }
+
+    function create_modal(new_div, id) {
+
+        // let new_div = document.getElementById('compo'+id)
+        console.log(new_div)
+        new_div.innerHTML = '<div className="modal-dialog modal-dialog-centered"> <div className="modal-content"> <div className="modal-header"><h5 className="modal-title">'+id+' composante</h5><button type="button" className="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div className="modal-body"><p>Modal body text goes here.</p></div><div className="modal-footer"><button type="button" className="btn btn-secondary" data-dismiss="modal">Close</button><button type="button" className="btn btn-primary">Save changes</button></div></div></div>';
+        console.log(new_div)
+        new_div.classList.add('modal');
+        new_div.tabIndex = -1
+        console.log(typeof new_div);
+
+    }
+
+</script>
+</html>

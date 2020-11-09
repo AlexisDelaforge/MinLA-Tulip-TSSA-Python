@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Vizualisation of frontiers</title>
+    <script src="https://d3js.org/d3.v4.js"></script>    <!-- This downloads d3 library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.15/lodash.min.js"> </script>
+    <script>
+        _ = _.noConflict();
+    </script>
+
+</head>
+<body>
+    <svg id="vizualisation">
+    </svg>
+</body>
+<script>
+
+    const socketProtocol = (window.location.protocol === 'https:' ? 'wss:' : 'ws:')
+    const echoSocketUrl = socketProtocol + '//' + window.location.hostname + '/echo/'
+    const socket = new WebSocket(echoSocketUrl);
+
+    socket.onopen = () => {
+        socket.send('Here\'s some text that the server is urgently awaiting!');
+    }
+
+    socket.onmessage = e => {
+        console.log('Message from server:', event.data)
+    }
+
+</script>
+</html>

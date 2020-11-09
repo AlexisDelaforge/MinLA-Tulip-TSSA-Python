@@ -8,6 +8,7 @@ import numpy as np
 import scipy.stats as st
 import numpy.random as rn
 import copy
+import itertools
 
 # get_key(position, node_1)**2/1000
 # A CHANGER
@@ -62,7 +63,7 @@ def main(file, graph):
         # print(viewColor[graph.target(e)])
 
     for n in graph.getNodes():
-        print(n)
+        # print(n)
         vois = 0
         if viewColor[n] == (200, 0, 0, 255):
             Classe[n] = 'frontier'
@@ -84,7 +85,7 @@ def fim(graph, less_degree = False):
     viewLayout = graph.getLayoutProperty("viewLayout")
     U = graph.getBooleanProperty('U')
     F = graph.getBooleanProperty('F')
-    P = graph.getBooleanProperty('F')
+    P = graph.getBooleanProperty('P')
     Tl = graph.getIntegerProperty('Tl')
     Tr = graph.getIntegerProperty('Tr')
     Dg = graph.getIntegerProperty("Voisin")
@@ -117,7 +118,7 @@ def fim(graph, less_degree = False):
             Tr[a_node] = Dg[a_node] - Tl[a_node]
             Sf[a_node] = Tr[a_node] - Tl[a_node]
 
-            F[neig] = True
+            #F[neig] = True
             if name[a_node] not in nb_nodes_done:
                 node = a_node
         for min_node in graph.getNodes():
@@ -167,28 +168,31 @@ def annealing(graph, cost_function, random_neighbour, temperature, maxsteps=1000
     state = graph
     cost = cost_function(state)
     states, costs = [get_position(graph)], [cost]
+    # print(state.nodes())
     tlp.saveGraph(state, './BSF.tlp')
     T = temperature
     sigma_temp = 1 # A CHANGER !!!
     for step in range(maxsteps):
         state = tlp.loadGraph('./BSF.tlp')
-        fraction = step / float(maxsteps)
-        # sigma_temp = np.std(costs)
-        position = get_position(state)
-        node = random_node(state)
-        new_state, new_position, type = move_node_n3(state, position, node, p)
-        new_cost = cost_function(new_state)
-        if debug: print("Step #{:>2}/{:>2} : T = {:>4.3g}, cost = {:>4.3g}, new_cost = {:>4.3g}, type {} ...".format(step, maxsteps, T, cost, new_cost, type))
-        if acceptance_probability(cost, new_cost, T) > rn.random():
-            tlp.saveGraph(state, './BSF.tlp')
-            state, cost = new_state, new_cost
-            states.append(position)
-            costs.append(cost)
-            print("  ==> Accept it!")
-        else:
-            print("  ==> Reject it...")
-        sigma_temp = 1 # A REVOIR !!!!
-        T = new_temperature(T, sigma_temp, distance)
+        if len(state.nodes()) !=0: # AAAA VOIIIR
+            # print(state.nodes())
+            fraction = step / float(maxsteps)
+            # sigma_temp = np.std(costs)
+            position = get_position(state)
+            node = random_neighbour(state)
+            new_state, new_position, type = move_node_n3(state, position, node, p)
+            new_cost = cost_function(new_state)
+            if debug: print("Step #{:>2}/{:>2} : T = {:>4.3g}, cost = {:>4.3g}, new_cost = {:>4.3g}, type {} ...".format(step, maxsteps, T, cost, new_cost, type))
+            if acceptance_probability(cost, new_cost, T) > rn.random():
+                tlp.saveGraph(state, './BSF.tlp')
+                state, cost = new_state, new_cost
+                states.append(position)
+                costs.append(cost)
+                print("  ==> Accept it!")
+            else:
+                print("  ==> Reject it...")
+            sigma_temp = 1 # A REVOIR !!!!
+            T = new_temperature(T, sigma_temp, distance)
     return state, cost_function(state), states, costs
 
 def tssa_objective_function(graph):
@@ -247,26 +251,29 @@ def move_node_n1(graph, position, node):
         # print(position)
 
     # Mediane of neighbors
-    if len(position)%2 == 0:
-        median = int((1/2)*(neighbors[int(len(neighbors)/2)-1]+neighbors[int(1+len(neighbors)/2)-1]))
-    else:
-        # print(int((len(position) + 1) / 2))
-        median = int(neighbors[(int((len(neighbors)+1)/2))-1])
+    if len(neighbors)%2 != 0:
+        if len(neighbors)%2 == 0:
+            # print(neighbors)
+            median = int((1/2)*(neighbors[int(len(neighbors)/2)-1]+neighbors[int(1+len(neighbors)/2)-1]))
+        else:
+            # print(int((len(position) + 1) / 2))
+            # print(neighbors)
+            median = int(neighbors[(int((len(neighbors)+1)/2))-1])
 
-    # Mediane of neighbors closer nodes
-    MU = []
-    MU_tssa = []
-    for indice in range(median-2, median+2):
-        if indice >= 1:
-            MU.append(position[indice-1])
-            MU_tssa.append(tssa_objective_function(swap_nodes(graph, position, node, MU[-1])[0]))
+        # Mediane of neighbors closer nodes
+        MU = []
+        MU_tssa = []
+        for indice in range(median-2, median+2):
+            if indice >= 1:
+                MU.append(position[indice-1])
+                MU_tssa.append(tssa_objective_function(swap_nodes(graph, position, node, MU[-1])[0]))
 
-    # Tab of indices of best tssa value
-    indices = [i for i, x in enumerate(MU_tssa) if x == min(MU_tssa)]
+        # Tab of indices of best tssa value
+        indices = [i for i, x in enumerate(MU_tssa) if x == min(MU_tssa)]
 
-    # Move nodes to get the best change possible
-    graph, position = swap_nodes(graph, position, node, position[random.choice(indices)])
-    # print(MU_tssa[indices[0]])
+        # Move nodes to get the best change possible
+        graph, position = swap_nodes(graph, position, node, position[random.choice(indices)])
+        # print(MU_tssa[indices[0]])
 
     return graph, position
 
@@ -292,9 +299,10 @@ def move_node_n2(graph, position, node):
 
     # Tab of indices of best tssa value
     indices = [i for i, x in enumerate(ALL_tssa) if x == min(ALL_tssa)]
-
+    # print(indices)
     # Move nodes to get the best change possible
-    graph, position = swap_nodes(graph, position, node, position[random.choice(indices)])
+    if len(indices) !=0:
+        graph, position = swap_nodes(graph, position, node, position[random.choice(indices)])
     # print(ALL_tssa[indices[0]])
 
     return graph, position
@@ -338,5 +346,119 @@ def gamma_inf(graph, C_inf, Sig_inf):
 
 def new_temperature(temp, sigma_temp, dist):
     return temp*(1+(math.log(1+dist)*temp)/(3*sigma_temp))**(-1)
+
+def minLA(graph, position_n, steps=500, ancient=True):
+    viewLayout = graph.getLayoutProperty("viewLayout")
+    classe = graph.getStringProperty("Classe")
+    viewLabel = graph.getStringProperty("viewLabel")
+
+    frontier_component = []
+    for n in graph.nodes():
+        if classe[n] == 'frontier':
+            frontier_component.append(n)
+    frontier_component = graph.inducedSubGraph(frontier_component, parentSubGraph=graph, name="comp_frontier")
+    # print("len juste front : "+str(len(frontier_component.nodes())))
+    if tlp.loadGraph('./comp/test_V9_'+str(graph.getName())+'_done.tlp') == None:
+        # print("create fil")
+        fimed = fim(frontier_component, False)  # initial placement
+        tlp.saveGraph(fimed, './comp/test_V9_'+str(graph.getName())+'_done.tlp')
+    fimed = tlp.loadGraph('./comp/test_V9_' + str(graph.getName()) + '_done.tlp')
+    best_solution = tssa_objective_function(fimed)
+    position = get_position(fimed)
+    # print(len(position))
+    # print(len(frontier_component.nodes()))
+    C_inf, Sig_inf = generate_independant_solutions(fimed, position, 10 ** 3)
+
+    if ancient:
+        if tlp.loadGraph('./comp/test_V9_' + str(graph.getName()) + '_annealed_done.tlp') == None:
+            output = annealing(
+                fimed,
+                cost_function,
+                random_node,
+                temperature(frontier_component, position, C_inf, Sig_inf, best_solution),
+                maxsteps=steps,
+                distance=0.1,
+                debug=True)
+            tlp.saveGraph(output[0], './comp/test_V9_' + str(graph.getName()) + '_annealed_done.tlp')
+            del output
+        new_graph = tlp.loadGraph('./comp/test_V9_' + str(graph.getName()) + '_annealed_done.tlp')
+    else:
+        output = annealing(
+            fimed,
+            cost_function,
+            random_node,
+            temperature(frontier_component, position, C_inf, Sig_inf, best_solution),
+            maxsteps=steps,
+            distance=0.1,
+            debug=True)
+        tlp.saveGraph(output[0], './comp/AMAZ/test_amaz_' + str(graph.getName()) + '_annealed_done.tlp')
+        new_graph = tlp.newGraph()
+        tlp.copyToGraph(new_graph, output[0])
+        del output
+
+    # no_front = []
+    viewLayoutNew = new_graph.getLayoutProperty("viewLayout")
+    viewLabelNew = new_graph.getStringProperty("viewLabel")
+    for n in graph.nodes():
+        if classe[n] == 'frontier':
+            # same_node = viewLabelNew.getNodesEqualTo(viewLabel[n])
+            for same_node in viewLabelNew.getNodesEqualTo(viewLabel[n]): # only one iter
+                viewLayout[n] = viewLayoutNew[same_node]
+            # viewLayout[n] = viewLayoutNew[same_node[0]]
+            # print(viewLabelNew[same_node])
+            # print(viewLabel[n])
+            # no_front.append(n)
+            # test +=1
+        graph.addNode(n)
+        # print(len(graph.nodes()))
+    # print("len juste front graph nodes: " + str(test))
+    tlp.saveGraph(graph, './comp/test_V9_' + str(graph.getName()) + '_annealed_allnodes_done.tlp')
+    # A VOIR
+    # print(frontier_component.nodes()+no_front)
+    # final_graph = graph.inducedSubGraph(frontier_component.nodes()+no_front, parentSubGraph=graph, name="comp_frontier")
+    final_graph = graph
+
+    for n in final_graph.getNodes():
+        viewLayout[n] = (viewLayout[n][0]+position_n,viewLayout[n][1],0)
+
+
+    # final_graph = graph.inducedSubGraph(output.nodes(), parentSubGraph=graph, name="MinLA_final_graph")
+
+    for n in final_graph.getNodes():
+        viewLayout[n][1] += position_n
+    position_n += len(frontier_component.nodes()) + 2
+    return final_graph, position_n
+
+def minLA_each_components(graph, type_step='fix', nb_steps=500, ancient=False):
+    position_n = 0
+    components = tlp.ConnectedTest.computeConnectedComponents(graph)
+    # print(len(components))
+    comps = []
+    for i in range(len(components)):
+        print(type(components[i]))
+        print(type(graph))
+        # pv_graph = tlp.newGraph()
+        # print(components[i])
+        # pv_graph = pv_graph.addNodes(components[i])
+
+        comps.append(graph.inducedSubGraph(list(components[i]), parentSubGraph=graph, name="comp_"+str(i)))
+        if len(comps[i].nodes()) != 0:
+            if type_step == 'fix':
+                comps[i], position_n = minLA(comps[i], position_n, nb_steps, ancient)
+            elif type_step == 'proportion':
+                comps[i], position_n = minLA(comps[i], position_n, (comps[i].numberOfNodes()*nb_steps), ancient)
+
+    # print(comps)
+
+    new_graph = tlp.newGraph()
+    for i in range(len(comps)):
+        print(i)
+        tlp.copyToGraph(new_graph, comps[i])
+        print(len(new_graph.nodes()))
+        # new_graph = new_graph.inducedSubGraph(comps[i].nodes(), parentSubGraph=graph, name="minLA_Graph")
+    return new_graph
+
+
+
 
 #def stop(outputs, espilon):
